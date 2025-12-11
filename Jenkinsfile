@@ -49,10 +49,10 @@ pipeline {
                     echo "📤 Отправка в registry..."
                     docker push ${env.FULL_IMAGE}
                     echo "✅ Образ отправлен"
-                '''
+                """
             }
         }
-        
+
         stage('Deploy') {
             steps {
                 script {
@@ -60,41 +60,49 @@ pipeline {
                         credentialsId: SSH_CREDENTIALS,
                         keyFileVariable: 'SSH_KEY'
                     )]) {
-                        sh """
+                        // Используем тройные кавычки и escape $ для Jenkins
+                        sh '''#!/bin/bash
                             echo "🚀 Деплой на App VM..."
-                            ssh -o StrictHostKeyChecking=no -i ${SSH_KEY} ubuntu@${APP_IP} "
+                            ssh -o StrictHostKeyChecking=no -i "$SSH_KEY" ubuntu@''' + APP_IP + ''' "
                                 echo '=== Начало деплоя ==='
-                                
+
                                 # Останавливаем старый контейнер
                                 docker stop visits-app 2>/dev/null || true
                                 docker rm visits-app 2>/dev/null || true
-                                
+
                                 # Скачиваем новый образ
-                                docker pull ${env.FULL_IMAGE}
-                                
+                                docker pull ''' + env.FULL_IMAGE + '''
+
                                 # Запускаем приложение
                                 docker run -d \\
                                   --name visits-app \\
                                   -p 8080:5000 \\
                                   -e REDIS_HOST=redis \\
                                   --network visits-network \\
-                                  ${env.FULL_IMAGE}
-                                  
+                                  ''' + env.FULL_IMAGE + '''
+
                                 echo '✅ Приложение запущено'
-                                echo 'Проверка: curl http://localhost:8080/health'
+                                sleep 3
+                                curl -f http://localhost:8080/health || echo 'Приложение запускается...'
                             "
-                        """
+                        '''
                     }
                 }
             }
         }
     }
-    
+
     post {
         always {
             echo "📊 Pipeline завершён"
             echo "🌐 Приложение: http://${APP_IP}:8080"
             echo "🏥 Health check: http://${APP_IP}:8080/health"
+        }
+        success {
+            echo "🎉 УСПЕХ! CI/CD пайплайн выполнен"
+        }
+        failure {
+            echo "💥 ОШИБКА! Проверьте логи"
         }
     }
 }
