@@ -1,0 +1,9 @@
+Собрать образ: docker build -t visits-counter .
+
+Сохранить образ: docker save -o visits-counter.tar visits-counter
+
+Отправить на сервер: scp visits-counter.tar user@server-ip:/tmp/
+
+На сервере загрузить: docker load -i /tmp/visits-counter.tar
+
+Запустить: docker run -d -p 80:5000 --name visits-app visits-counter
